@@ -275,7 +275,7 @@ public class AuthzUtil {
                 addNewScopesMappedToLegacyScopes(permissions, internalScopes);
             }
         }
-        return new HashSet<>(permissions).containsAll(requestedPermissions);
+        return requestedPermissions.stream().anyMatch(new HashSet<>(permissions)::contains);
     }
 
     /**
