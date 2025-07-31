@@ -278,6 +278,39 @@ public class AuthzUtil {
         return new HashSet<>(permissions).containsAll(requestedPermissions);
     }
 
+    public static boolean isUserAuthorized(AuthenticatedUser authenticatedUser, List<String> requestedPermissions,
+                                    String scopeValidationType) throws IdentityOAuth2Exception {
+
+        // Application id is not required for basic authentication flow.
+        List<String> roleIds = getUserRoles(authenticatedUser, null);
+        List<String> permissions;
+        /*
+         If the authenticatedUser contains an accessing organization, the  scopes should be checked against the
+         accessing organization.
+        */
+        if (StringUtils.isNotEmpty(authenticatedUser.getAccessingOrganization())) {
+            permissions = getAssociatedScopesForRoles(roleIds,
+                    authenticatedUser.getAccessingOrganization());
+        } else {
+            permissions = getAssociatedScopesForRoles(roleIds, authenticatedUser.getTenantDomain());
+        }
+        if (OAuthServerConfiguration.getInstance().isUseLegacyPermissionAccessForUserBasedAuth()) {
+            // Handling backward compatibility for previous access level.
+            List<String> internalScopes = getInternalScopes(authenticatedUser.getTenantDomain());
+            List<String> approvedInternalScopes = permissions.stream().filter(internalScopes::contains)
+                    .collect(Collectors.toList());
+            if (!approvedInternalScopes.isEmpty()) {
+                addNewScopesMappedToLegacyScopes(permissions, internalScopes);
+            }
+        }
+
+        if ("OR".equals(scopeValidationType)) {
+            return requestedPermissions.stream().anyMatch(permissions::contains);
+        }
+        // Default behavior is AND.
+        return new HashSet<>(permissions).containsAll(requestedPermissions);
+    }
+
     /**
      * Get the role ids of user.
      *
